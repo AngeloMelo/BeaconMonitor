@@ -1,0 +1,39 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:orientation="vertical" >
+
+    <TextView
+        android:id="@+id/result"
+        android:layout_width="226dp"
+        android:layout_height="wrap_content"
+        android:text="Bluetooth Test" />
+    
+    
+    <TextView
+        android:id="@+id/message"
+        android:layout_width="226dp"
+        android:layout_height="wrap_content"
+        android:text="Bluetooth Test" />
+    
+
+   
+    <Button
+        android:id="@+id/turnonBtn"
+        android:layout_width="227dp"
+        android:layout_height="wrap_content"
+        android:text="Turn On" />
+
+    <Button
+        android:id="@+id/disconnectBtn"
+        android:layout_width="230dp"
+        android:layout_height="wrap_content"
+        android:text="Turn Off" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" >
+
+    </LinearLayout>
+    
+</LinearLayout>

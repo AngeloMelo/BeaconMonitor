@@ -1,7 +1,11 @@
 package com.example.das.ufsc.beaconmonitor;
 
 import java.io.IOException;
-import java.util.concurrent.ScheduledExecutorService;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import com.example.das.ufsc.beaconmonitor.utils.BeaconDefaults;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -37,7 +41,7 @@ public class Manager
 			{
 				beaconMac =(String) msg.obj;
 				
-				ui.showToast("conectado ao beacon " );
+				ui.showToast("conectado ao beacon ");
 				
 				break;
 			}
@@ -47,9 +51,6 @@ public class Manager
 		
 	};
 	
-	private ScheduledExecutorService executor;
-	
-
 	
 	public Manager(Main uiRef)
 	{
@@ -63,27 +64,61 @@ public class Manager
 	}
 
 
-	private void readTic(String readMessage) 
+	private void readTic(String msgRead) 
 	{
-		if(readMessage != null && readMessage.contains("tic"))
+		if(msgRead != null)
 		{
-			ui.showToast("msg recebida: " +readMessage);
+			ui.showToast("msg recebida: " +msgRead);
+			
 			//interrmpe conexao
-			try {
-				comunicationService.sendMessage("ack");
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
+			sendAckMessage();
+						
+			try 
+			{
+				JSONObject json = new JSONObject(msgRead);
+				if(json.has("tic"))
+				{
+					int tic = json.getInt("tic");
+					prepareNewCall(tic);
+				}
+			} 
+			catch (JSONException e) 
+			{
 				e.printStackTrace();
 			}
-			
-			String sTic = readMessage.replace("tic:", "");
-			int tic = Integer.valueOf(sTic);
-			
-			prepareNewCall(tic);
 		}
 	}
 	
 	
+	private void sendAckMessage() 
+	{
+		try 
+		{
+			String jsonString = "{";
+			jsonString = jsonString + BeaconDefaults.MAC_KEY + ":" + btAdapter.getAddress();
+			jsonString = jsonString + "," + BeaconDefaults.OPP_MODE_KEY + ":" + getOppMode();
+			jsonString = jsonString + "," + BeaconDefaults.ACK_KEY + ":true"; 
+			jsonString = jsonString + "}";
+			
+			comunicationService.sendMessage(jsonString);	
+				
+		} 
+		catch (IOException e) 
+		{
+
+			e.printStackTrace();
+		}
+
+	}
+
+
+	//TODO build this method
+	private int getOppMode() 
+	{
+		return BeaconDefaults.OPP_MODE_AUTHENTIC;
+	}
+
+
 	private void prepareNewCall(int tic)
 	{
 		try 
@@ -118,8 +153,6 @@ public class Manager
 		}
 	}
 
-	
-
 
 
 	public void turnOnBluetooth() 
@@ -138,8 +171,6 @@ public class Manager
 	{
 		//desliga o bluetooth
 		btAdapter.disable();
-		
-		//executor.shutdownNow();
 		
 		//para o servico de comunicacao
 		comunicationService.stop();
@@ -167,14 +198,29 @@ public class Manager
 
 	public void connect(BluetoothDevice remoteDevice) 
 	{
-		try 
+		if(isBeacon(remoteDevice))
 		{
-			comunicationService.connect(remoteDevice);
-		} 
-		catch (IOException e)
-		{
-			ui.showToast(e.getMessage());
-		}	
+			try 
+			{
+				comunicationService.connect(remoteDevice);
+			} 
+			catch (IOException e)
+			{
+				ui.showToast(e.getMessage());
+			}	
+		}
+	}
+
+
+	/**
+	 * checks if a remote device is a known beacon device
+	 * @param remoteDevice
+	 * @return
+	 */
+	private boolean isBeacon(BluetoothDevice remoteDevice) 
+	{
+		String mac = remoteDevice.getAddress();
+		return BeaconDefaults.checkBeacon(mac);
 	}	
 	
 	

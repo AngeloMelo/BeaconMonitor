@@ -3,14 +3,13 @@ package com.example.das.ufsc.beaconmonitor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.os.Handler;
+
+import com.example.das.ufsc.beaconmonitor.utils.BeaconDefaults;
 
 
 public class CommunicationService
@@ -20,9 +19,6 @@ public class CommunicationService
 	public static final int MSG_TYPE_STOP_DISCOVERY = 2;
 	public static final int MSG_TYPE_CONNECTED_TO_BEACON = 3;
 	
-	public static final String NAME = "beacon";
-	public static final UUID MY_UUID = UUID.fromString("061d3751-78df-472c-8957-07df79497e71");
-
 	private ReadWriteThread mReadWriteThread;
 	private ConnectThread mConnectThread;
 	private BluetoothAdapter mAdapter;
@@ -34,6 +30,7 @@ public class CommunicationService
         mAdapter = BluetoothAdapter.getDefaultAdapter();
         mHandler = handler;
     }
+	
 	
 	public synchronized void start() 
 	{
@@ -106,7 +103,7 @@ public class CommunicationService
 	        // Use a temporary object that is later assigned to mmSocket, because mmSocket is final
 	        BluetoothSocket tmp = null;
 	        
-	        tmp = device.createInsecureRfcommSocketToServiceRecord(MY_UUID);
+	        tmp = device.createInsecureRfcommSocketToServiceRecord(BeaconDefaults.MY_UUID);
 	        mmSocket = tmp;
 	    }
 	 

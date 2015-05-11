@@ -14,7 +14,6 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 
 
 public class Main extends Activity 
@@ -115,15 +114,20 @@ public class Main extends Activity
 			}
 		});
 		
+		//register the broadcast receiver to handle the action found
+		//every time a device is found it calls the discoveryResult's method onReceive 
 		registerReceiver(discoveryResult, new IntentFilter(BluetoothDevice.ACTION_FOUND));
 	}
 	
 	BroadcastReceiver discoveryResult = new BroadcastReceiver()
 	{
+		/**
+		 * onReceive is called for every device found on inquiry procedure while the discovery is running
+		 */
 		@Override
 		public void onReceive(Context context, Intent intent)
 		{
-			BluetoothDevice remoteDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE );
+			BluetoothDevice remoteDevice = intent.getParcelableExtra( BluetoothDevice.EXTRA_DEVICE );
 			manager.connect(remoteDevice);
 		}
 	};

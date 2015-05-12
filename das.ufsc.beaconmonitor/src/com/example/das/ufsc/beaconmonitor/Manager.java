@@ -76,9 +76,9 @@ public class Manager
 			try 
 			{
 				JSONObject json = new JSONObject(msgRead);
-				if(json.has("tic"))
+				if(json.has(BeaconDefaults.TIC_KEY))
 				{
-					int tic = json.getInt("tic");
+					int tic = json.getInt(BeaconDefaults.TIC_KEY);
 					prepareNewCall(tic);
 				}
 			} 
@@ -95,9 +95,9 @@ public class Manager
 		try 
 		{
 			String jsonString = "{";
-			jsonString = jsonString + BeaconDefaults.MAC_KEY + ":" + btAdapter.getAddress();
-			jsonString = jsonString + "," + BeaconDefaults.OPP_MODE_KEY + ":" + getOppMode();
-			jsonString = jsonString + "," + BeaconDefaults.ACK_KEY + ":true"; 
+			jsonString = jsonString + BeaconDefaults.MAC_KEY + ":'" + btAdapter.getAddress();
+			jsonString = jsonString + "'," + BeaconDefaults.OPP_MODE_KEY + ":" + getOppMode();
+			jsonString = jsonString + "," + BeaconDefaults.ACK_KEY + ":'true'"; 
 			jsonString = jsonString + "}";
 			
 			comunicationService.sendMessage(jsonString);	

@@ -82,7 +82,10 @@ public class CommunicationService
 
 	public synchronized void sendMessage(String msg) throws IOException
     {
-    	mReadWriteThread.write(msg.getBytes());
+		if(mReadWriteThread != null)
+    	{
+			mReadWriteThread.write(msg.getBytes());
+    	}
     }
     
 	

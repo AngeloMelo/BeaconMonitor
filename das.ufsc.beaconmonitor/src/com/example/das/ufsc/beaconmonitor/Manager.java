@@ -1,16 +1,19 @@
 package com.example.das.ufsc.beaconmonitor;
 
 import java.io.IOException;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import com.example.das.ufsc.beaconmonitor.utils.BeaconDefaults;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.os.Handler;
 import android.os.Message;
+
+import com.example.das.ufsc.beaconmonitor.utils.BeaconDefaults;
 
 
 public class Manager 
@@ -18,12 +21,17 @@ public class Manager
 	private BluetoothAdapter btAdapter;
 	private CommunicationService comunicationService;
 	private Main ui;
+	
+	//TODO remover
 	private String beaconMac;
+	
+	private Date startDiscoveryTS;
+	private Map<String, ConnectionPerformanceInfo> currentConnectedBeacons;
 	
 	private final Handler mHandler = new Handler() 
 	{
 		@Override
-		public void handleMessage(Message msg) 
+		public synchronized void handleMessage(Message msg) 
 		{
 			switch(msg.what)
 			{
@@ -40,15 +48,13 @@ public class Manager
 			case CommunicationService.MSG_TYPE_CONNECTED_TO_BEACON:
 			{
 				beaconMac =(String) msg.obj;
-				
+				setConnectionDate(beaconMac);
 				ui.showToast("conectado ao beacon ");
 				
 				break;
 			}
 			}
 		}
-
-		
 	};
 	
 	
@@ -61,6 +67,8 @@ public class Manager
 		//obtem a interface para o hardware bluetooth do dispositivo
 		btAdapter = BluetoothAdapter.getDefaultAdapter();
 		comunicationService = new CommunicationService(mHandler);
+		
+		this.currentConnectedBeacons = new HashMap<String, ConnectionPerformanceInfo>();
 	}
 
 
@@ -68,7 +76,7 @@ public class Manager
 	{
 		if(msgRead != null)
 		{
-			ui.showToast("msg recebida: " +msgRead);
+			ui.showToast("msg recebida: " + msgRead);
 			
 			//interrmpe conexao
 			sendAckMessage();
@@ -94,12 +102,9 @@ public class Manager
 	{
 		try 
 		{
-			String jsonString = "{";
-			jsonString = jsonString + BeaconDefaults.MAC_KEY + ":'" + btAdapter.getAddress();
-			jsonString = jsonString + "'," + BeaconDefaults.OPP_MODE_KEY + ":" + getOppMode();
-			jsonString = jsonString + "," + BeaconDefaults.ACK_KEY + ":'true'"; 
-			jsonString = jsonString + "}";
-			
+			ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(beaconMac);
+			String jsonString = BeaconDefaults.formatJson(btAdapter.getAddress(), getOppMode(), connPerformanceInfo);
+						
 			comunicationService.sendMessage(jsonString);	
 				
 		} 
@@ -121,17 +126,13 @@ public class Manager
 
 	private void prepareNewCall(int tic)
 	{
-		try 
-		{
-			Thread.sleep(tic * 1000);
-		} 
-		catch (InterruptedException e) 
-		{
-			e.printStackTrace();
-		}
-		
-		//ui.showToast("ligando novamente ao beacon " );
-		
+		CallWaiter callWaiter = new CallWaiter(tic * 1000);
+		callWaiter.start();
+	}
+	
+	
+	private void callBeacon()
+	{
 		BluetoothDevice beaconDevice = btAdapter.getRemoteDevice(beaconMac);
 		try 
 		{
@@ -139,13 +140,14 @@ public class Manager
 		} 
 		catch (IOException e) 
 		{
-			e.printStackTrace();
+			ui.showToast(e.getMessage());
 		}
 	}
 	
-	
 	private void startDiscovery() 
 	{
+		//record start discovery
+		this.startDiscoveryTS = new Date();
 		//start discovery
 		if(btAdapter.startDiscovery())
 		{
@@ -169,11 +171,19 @@ public class Manager
 
 	public void stopBeacon() 
 	{
-		//desliga o bluetooth
-		btAdapter.disable();
+		try
+		{
+			//para o servico de comunicacao
+			comunicationService.stop();
+			
+			//desliga o bluetooth
+			btAdapter.disable();
+		}
+		catch(Exception e)
+		{
+			ui.showToast(e.getMessage());
+		}
 		
-		//para o servico de comunicacao
-		comunicationService.stop();
 	}
 
 
@@ -202,6 +212,21 @@ public class Manager
 		{
 			try 
 			{
+				//records the first connection initial date
+				if(!this.currentConnectedBeacons.containsKey(remoteDevice.getAddress()))
+				{
+					ConnectionPerformanceInfo connPerformanceInfo = new ConnectionPerformanceInfo();
+					connPerformanceInfo.setStartDiscoveryTS(this.getStartDiscoveryTS());
+					connPerformanceInfo.setBeaconFoundTS(new Date());
+					
+					this.currentConnectedBeacons.put(remoteDevice.getAddress(), connPerformanceInfo);
+				}
+				else
+				{
+					ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(remoteDevice.getAddress());
+					connPerformanceInfo.setStartDiscoveryTS(this.getStartDiscoveryTS());
+					connPerformanceInfo.setBeaconFoundTS(new Date());
+				}
 				comunicationService.connect(remoteDevice);
 			} 
 			catch (IOException e)
@@ -224,4 +249,48 @@ public class Manager
 	}	
 	
 	
+	private void setConnectionDate(String beaconMac)
+	{
+		ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(beaconMac);
+		
+		//records the connection ts
+		if(connPerformanceInfo.isFirstConnection())
+		{
+			connPerformanceInfo.setFirstConnectionTS(new Date());
+		}
+		else
+		{
+			connPerformanceInfo.setLastAcceptedConnectionTS(new Date());
+		}
+	}
+	
+	public Date getStartDiscoveryTS() 
+	{
+		return startDiscoveryTS;
+	}
+	
+	private class CallWaiter extends Thread
+	{
+		private long timeToWait;
+		
+		public CallWaiter(long time)
+		{
+			super();
+			this.timeToWait = time;
+		}
+		
+		public void run()
+		{
+			try 
+			{
+				sleep(timeToWait);
+			} 
+			catch (InterruptedException e) 
+			{
+				e.printStackTrace();
+			}
+		
+			callBeacon();
+		}
+	}
 }

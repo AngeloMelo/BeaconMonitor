@@ -45,8 +45,8 @@ public class CommunicationService
 	
 	public synchronized void stop()
 	{
+		if (mReadWriteThread != null) {mReadWriteThread.cancel(); mReadWriteThread = null;}
 		if (mConnectThread != null) {mConnectThread.cancel(); mConnectThread = null;}
-        if (mReadWriteThread != null) {mReadWriteThread.cancel(); mReadWriteThread = null;}
 	}
 	
 	
@@ -89,16 +89,17 @@ public class CommunicationService
     }
     
 	
-	public void stopConnectionThreads() 
+	/*public void stopConnectionThreads() 
 	{
 		if (mConnectThread != null) {mConnectThread.cancel(); mConnectThread = null;}
 	}
-	
+	*/
 	
 	private class ConnectThread extends Thread 
 	{
 		private final BluetoothSocket mmSocket;
 	    private final BluetoothAdapter mBluetoothAdapter;
+	    private boolean running = true;
 	    
 	    public ConnectThread(BluetoothDevice device, BluetoothAdapter bluetoothAdapter) throws IOException 
 	    {
@@ -112,6 +113,8 @@ public class CommunicationService
 	 
 	    public void run() 
 	    {
+	    	if(!running) return;
+	    	
 	        // Cancel discovery because it will slow down the connection
 	        mBluetoothAdapter.cancelDiscovery();
 	 
@@ -134,12 +137,9 @@ public class CommunicationService
 	        startTransmission(mmSocket);
 	    }
 	    
-	    /** Will cancel an in-progress connection, and close the socket */
 	    public void cancel()
 	    {
-	        try {
-	            mmSocket.close();
-	        } catch (IOException e) { }
+	        this.running = false;
 	    }
 	}
 	
@@ -203,10 +203,29 @@ public class CommunicationService
 	    public void cancel() 
 	    {
 	        try 
-	        {
-	            mmSocket.close();
+	        { 
+	        	if(mmInStream!= null)
+	        	{
+	        		mmInStream.close(); 
+	        	}
+	        	
+	        	if(mmOutStream != null)
+	        	{
+	        		mmOutStream.close();
+	        	} 
 	        } 
-	        catch (IOException e) { }
+	        catch (IOException e) 
+	        {
+	        	e.printStackTrace();
+	        }
+	        try 
+	        { 
+	        	mmSocket.close();
+	        } 
+	        catch (IOException e) 
+	        { 
+	        	e.printStackTrace();
+	        }
 	    }
 	}
 

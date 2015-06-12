@@ -20,11 +20,17 @@ public class BeaconDefaults
 	public static final String OPP_MODE_KEY = "OPP_MODE";
 	public static final String ACK_KEY = "ACK";
 	public static final String TIC_KEY = "TIC";
+	public static final String TIC_LINEID_KEY = "LINEID";
+	public static final String TIC_LINENM_KEY = "LINENM";
+	public static final String TIC_LASTSTOPNM_KEY = "LASTSTOPNM";
 	
 	public static final String DISCOVERYDATE_KEY = "DISCTS";
 	public static final String BEACON_FOUND_TS_KEY = "BEACONFOUNDTS";
-	public static final String FIRSTCONNTS_KEY = "FIRSTCONNTS";
-	public static final String LASTCONNTS_KEY = "LASTCONNTS";
+	public static final String FIRST_CONN_ACCEPTANCE_TS_KEY = "FIRSTCONNACCEPTANCETS";
+	public static final String LAST_CONN_REQUEST_TS_KEY = "LASTCONNREQTS";
+	public static final String LAST_CONN_ACCEPTANCE_TS_KEY = "LASTCONNACCEPTANCETS";
+	public static final String LAST_TIC_RECEIVED_TS_KEY = "LASTTICRECEIVEDTS";
+	public static final String LAST_ACK_SENT_TS_KEY = "LASTACKSENTTS";
 	
 	//OPP MODES
 	public static final int OPP_MODE_AUTHENTIC = 0;
@@ -33,6 +39,8 @@ public class BeaconDefaults
 	
 
 	private static final List<String> beaconList;
+
+
 	
 	static
 	{
@@ -56,17 +64,35 @@ public class BeaconDefaults
 	{
 		Date startDiscoveryTs = connPerformanceInfo.getStartDiscoveryTS();
 		Date beaconFoundTs = connPerformanceInfo.getBeaconFoundTS();
-		Date firstConnectionTs = connPerformanceInfo.getFirstConnectionTS();
-		Date lastAcceptedConnectionTs = connPerformanceInfo.getLastAcceptedConnectionTS();
-
+		Date firstConnAcceptanceTs = connPerformanceInfo.getFirstConnAcceptanceTS();
+		Date lastConnRequest = connPerformanceInfo.getLastConnRequestTs();
+		Date lastAcceptedConnectionTs = connPerformanceInfo.getLastConnAcceptanceTs();
+		Date lastTickReceivedTs = connPerformanceInfo.getLastTicReceivedTs();
+		Date lastAckSentTs = connPerformanceInfo.getLastAckSentTs();
+		
 		String jsonString = "{";
 		jsonString = jsonString + BeaconDefaults.MAC_KEY + ":'" + address;
 		jsonString = jsonString + "'," + BeaconDefaults.OPP_MODE_KEY + ":" + oppMode;
 		jsonString = jsonString + "," + BeaconDefaults.ACK_KEY + ":'true'"; 
 		jsonString = jsonString + "," + BeaconDefaults.DISCOVERYDATE_KEY + ":" + getStrDate(startDiscoveryTs); 
 		jsonString = jsonString + "," + BeaconDefaults.BEACON_FOUND_TS_KEY + ":" + getStrDate(beaconFoundTs);
-		jsonString = jsonString + "," + BeaconDefaults.FIRSTCONNTS_KEY + ":" + getStrDate(firstConnectionTs);
-		jsonString = jsonString + "," + BeaconDefaults.LASTCONNTS_KEY + ":" + getStrDate(lastAcceptedConnectionTs);
+		jsonString = jsonString + "," + BeaconDefaults.FIRST_CONN_ACCEPTANCE_TS_KEY + ":" + getStrDate(firstConnAcceptanceTs);
+		if(lastConnRequest != null)
+		{
+			jsonString = jsonString + "," + BeaconDefaults.LAST_CONN_REQUEST_TS_KEY + ":" + getStrDate(lastConnRequest);
+		}
+		if(lastAcceptedConnectionTs != null)
+		{
+			jsonString = jsonString + "," + BeaconDefaults.LAST_CONN_ACCEPTANCE_TS_KEY + ":" + getStrDate(lastAcceptedConnectionTs);
+		}
+		if(lastTickReceivedTs != null)
+		{
+			jsonString = jsonString + "," + BeaconDefaults.LAST_TIC_RECEIVED_TS_KEY + ":" + getStrDate(lastTickReceivedTs);
+		}
+		if(lastAckSentTs != null)
+		{
+			jsonString = jsonString + "," + BeaconDefaults.LAST_ACK_SENT_TS_KEY + ":" + getStrDate(lastAckSentTs);
+		}
 		jsonString = jsonString + "}";
 
 		return jsonString;

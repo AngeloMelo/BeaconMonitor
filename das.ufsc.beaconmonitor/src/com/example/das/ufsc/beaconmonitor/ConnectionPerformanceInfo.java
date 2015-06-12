@@ -6,9 +6,14 @@ public class ConnectionPerformanceInfo
 {
 	private Date startDiscoveryTS;
 	private Date beaconFoundTS;
-	private Date firstConnectionTS;	
+	private Date firstConnAcceptanceTS;	
+	private Date lastConnRequestTs;
+	private Date lastConnAcceptanceTs;
+	private Date lastTicReceivedTs;
+	private Date lastAckSentTs;
+	
+
 	private boolean firstConnection;
-	private Date lastAcceptedConnection;
 	
 	public ConnectionPerformanceInfo()
 	{
@@ -16,6 +21,30 @@ public class ConnectionPerformanceInfo
 		this.firstConnection = true;
 	}
 	
+	public Date getLastConnRequestTs() {
+		return lastConnRequestTs;
+	}
+
+	public void setLastConnRequestTs(Date lastConnRequestTs) {
+		this.lastConnRequestTs = lastConnRequestTs;
+	}
+
+	public Date getLastTicReceivedTs() {
+		return lastTicReceivedTs;
+	}
+
+	public void setLastTicReceivedTs(Date lastTicReceivedTs) {
+		this.lastTicReceivedTs = lastTicReceivedTs;
+	}
+
+	public Date getLastAckSentTs() {
+		return lastAckSentTs;
+	}
+
+	public void setLastAckSentTs(Date lastAckSentTs) {
+		this.lastAckSentTs = lastAckSentTs;
+	}
+
 	public Date getStartDiscoveryTS() {
 		return startDiscoveryTS;
 	}
@@ -25,19 +54,21 @@ public class ConnectionPerformanceInfo
 	public Date getBeaconFoundTS() {
 		return beaconFoundTS;
 	}
-	public void setBeaconFoundTS(Date beaconFoundTS) {
+	public void setBeaconFoundTS(Date beaconFoundTS) 
+	{
 		this.beaconFoundTS = beaconFoundTS;
+		this.lastConnRequestTs = beaconFoundTS;
 	}
 	
-	public Date getFirstConnectionTS() 
+	public Date getFirstConnAcceptanceTS() 
 	{
-		return firstConnectionTS;
+		return firstConnAcceptanceTS;
 	}
 	
-	public void setFirstConnectionTS(Date connDate) 
+	public void setFirstConnAcceptanceTS(Date connDate) 
 	{
-		this.firstConnectionTS = connDate;
-		this.lastAcceptedConnection = connDate;
+		this.firstConnAcceptanceTS = connDate;
+		this.lastConnAcceptanceTs = connDate;
 		setFirstConnection(false);
 	}
 
@@ -51,13 +82,24 @@ public class ConnectionPerformanceInfo
 		this.firstConnection = firstConnection;
 	}
 
-	public void setLastAcceptedConnectionTS(Date date) 
+	public void setLastConnAcceptanceTs(Date date) 
 	{
-		this.lastAcceptedConnection = date;
+		this.lastConnAcceptanceTs = date;
 	} 
 	
-	public Date getLastAcceptedConnectionTS() 
+	public Date getLastConnAcceptanceTs() 
 	{
-		return this.lastAcceptedConnection;
+		return this.lastConnAcceptanceTs;
+	}
+
+	public void setLastConnRequestTS(Date date) 
+	{
+		this.lastConnRequestTs = date;
 	} 
+	
+	public Date getLastConnRequestTS() 
+	{
+		return this.lastConnRequestTs;
+	} 
+
 }

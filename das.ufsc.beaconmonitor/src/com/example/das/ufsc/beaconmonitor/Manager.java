@@ -28,6 +28,8 @@ public class Manager
 	private Date startDiscoveryTS;
 	private Map<String, ConnectionPerformanceInfo> currentConnectedBeacons;
 	
+	private int operationMode;
+	
 	private final Handler mHandler = new Handler() 
 	{
 		@Override
@@ -67,26 +69,42 @@ public class Manager
 		//obtem a interface para o hardware bluetooth do dispositivo
 		btAdapter = BluetoothAdapter.getDefaultAdapter();
 		comunicationService = new CommunicationService(mHandler);
-		
+		init();
+	}
+	
+	private void init()
+	{
+		this.beaconMac = null;
+		this.startDiscoveryTS = null;
 		this.currentConnectedBeacons = new HashMap<String, ConnectionPerformanceInfo>();
+		this.operationMode = BeaconDefaults.OPP_MODE_AUTHENTIC;
 	}
 
 
 	private void readTic(String msgRead) 
 	{
 		if(msgRead != null)
-		{
-			ui.showToast("msg recebida: " + msgRead);
-			
-			//interrmpe conexao
-			sendAckMessage();
-						
+		{						
 			try 
 			{
 				JSONObject json = new JSONObject(msgRead);
 				if(json.has(BeaconDefaults.TIC_KEY))
 				{
+					ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(beaconMac);
+					connPerformanceInfo.setLastTicReceivedTs(new Date());
+					
 					int tic = json.getInt(BeaconDefaults.TIC_KEY);
+					
+					int lineId = json.getInt(BeaconDefaults.TIC_LINEID_KEY);
+					String lineName = json.getString(BeaconDefaults.TIC_LINENM_KEY);
+					String lastStop = json.getString(BeaconDefaults.TIC_LASTSTOPNM_KEY);
+	
+					this.ui.showBeaconInfo("Following Beacon for line " + lineName +"(" + lineId + ")");
+					this.ui.showStopInfo(lastStop);
+
+					//interrmpe conexao
+					sendAckMessage();
+
 					prepareNewCall(tic);
 				}
 			} 
@@ -103,8 +121,10 @@ public class Manager
 		try 
 		{
 			ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(beaconMac);
+			connPerformanceInfo.setLastAckSentTs(new Date());
+			
 			String jsonString = BeaconDefaults.formatJson(btAdapter.getAddress(), getOppMode(), connPerformanceInfo);
-						
+			
 			comunicationService.sendMessage(jsonString);	
 				
 		} 
@@ -120,7 +140,7 @@ public class Manager
 	//TODO build this method
 	private int getOppMode() 
 	{
-		return BeaconDefaults.OPP_MODE_AUTHENTIC;
+		return this.operationMode;
 	}
 
 
@@ -128,14 +148,23 @@ public class Manager
 	{
 		CallWaiter callWaiter = new CallWaiter(tic * 1000);
 		callWaiter.start();
+		
+		BTInterruptor interrupt = new BTInterruptor();
+		//interrupt.start();
 	}
 	
 	
 	private void callBeacon()
 	{
+		if( !btAdapter.isEnabled())
+		{
+			btAdapter.enable();
+		}
 		BluetoothDevice beaconDevice = btAdapter.getRemoteDevice(beaconMac);
 		try 
 		{
+			ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(beaconMac);
+			connPerformanceInfo.setLastConnRequestTS(new Date());
 			this.comunicationService.connect(beaconDevice);
 		} 
 		catch (IOException e) 
@@ -165,6 +194,8 @@ public class Manager
 			btAdapter.disable(); 
 		}
 		btAdapter.enable(); 	
+		
+		init();
 	}
 
 	
@@ -193,11 +224,8 @@ public class Manager
 		//inicia o servico de comunicacao
 		comunicationService.start();
 		
-		
-		//obtem o endereco de hardware do dispositivo
-		String address = btAdapter.getAddress();
 		String name = btAdapter.getName();
-		String statusText = "Device name: " + name + " MAC:" + address;		
+		String statusText = "Device name: " + name;		
 		
 		ui.showBluetoothProperties(statusText);	
 		
@@ -228,6 +256,7 @@ public class Manager
 					connPerformanceInfo.setBeaconFoundTS(new Date());
 				}
 				comunicationService.connect(remoteDevice);
+				this.ui.showBeaconInfo("Beacon found...");
 			} 
 			catch (IOException e)
 			{
@@ -253,20 +282,50 @@ public class Manager
 	{
 		ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(beaconMac);
 		
-		//records the connection ts
+		//keep the connection time
 		if(connPerformanceInfo.isFirstConnection())
 		{
-			connPerformanceInfo.setFirstConnectionTS(new Date());
+			connPerformanceInfo.setFirstConnAcceptanceTS(new Date());
 		}
 		else
 		{
-			connPerformanceInfo.setLastAcceptedConnectionTS(new Date());
+			connPerformanceInfo.setLastConnAcceptanceTs(new Date());
 		}
 	}
 	
 	public Date getStartDiscoveryTS() 
 	{
 		return startDiscoveryTS;
+	}
+	
+	
+	public void setDubiousMode(boolean dubious) 
+	{
+		if(dubious)
+		{
+			this.operationMode = BeaconDefaults.OPP_MODE_DUBIOUS;
+		}
+		else
+		{
+			this.operationMode = BeaconDefaults.OPP_MODE_AUTHENTIC;
+		}
+	}
+	
+	private class BTInterruptor extends Thread
+	{
+		public void run()
+		{
+			try 
+			{
+				sleep(2 * 1000);
+			} 
+			catch (InterruptedException e) 
+			{
+				e.printStackTrace();
+			}
+	
+			btAdapter.disable();
+		}
 	}
 	
 	private class CallWaiter extends Thread
@@ -293,4 +352,5 @@ public class Manager
 			callBeacon();
 		}
 	}
+
 }

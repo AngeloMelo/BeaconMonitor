@@ -13,6 +13,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.TextView;
 
 
@@ -23,7 +24,9 @@ public class Main extends Activity
 	private Button turnOn;
 	private Button disconnect;
 	private TextView statusUpdate;
-	private TextView message;
+	private TextView beaconInfo;
+	private TextView stopInfo;
+	private CheckBox cbDubious;
 	
 	BroadcastReceiver bluetoothState = new BroadcastReceiver()
 	{
@@ -77,12 +80,16 @@ public class Main extends Activity
 	private void setupUI() 
 	{
 		statusUpdate = (TextView) findViewById(R.id.result);
-		
-		message = (TextView) findViewById(R.id.message);
+		beaconInfo = (TextView) findViewById(R.id.beaconInfo);
+		stopInfo = (TextView) findViewById(R.id.stopInfo);
 		turnOn = (Button) findViewById(R.id.turnonBtn);
 		disconnect = (Button) findViewById(R.id.disconnectBtn);		
+		cbDubious = (CheckBox)findViewById(R.id.cbDubious);		
 		
 		disconnect.setVisibility(View.GONE);
+		cbDubious.setVisibility(View.GONE);
+		beaconInfo.setVisibility(View.GONE);
+		stopInfo.setVisibility(View.GONE);
 		
 		//cria actionListeners para o botao turnOn
 		turnOn.setOnClickListener(
@@ -109,8 +116,22 @@ public class Main extends Activity
 			public void onClick(View v)
 			{
 				disconnect.setVisibility(View.GONE);
+				cbDubious.setVisibility(View.GONE);
+				beaconInfo.setVisibility(View.GONE);
+				stopInfo.setVisibility(View.GONE);
 				turnOn.setVisibility(View.VISIBLE);
 				manager.stopBeacon();
+			}
+		});
+		
+		
+		cbDubious.setOnClickListener(new OnClickListener() 
+		{
+			
+			@Override
+			public void onClick(View v) 
+			{
+				manager.setDubiousMode(cbDubious.isChecked());			
 			}
 		});
 		
@@ -135,7 +156,19 @@ public class Main extends Activity
 	
 	public void showToast(String msg)
 	{
-		message.setText(msg);
+	}
+	
+	public void showBeaconInfo(String msg)
+	{
+		beaconInfo.setText(msg);
+		beaconInfo.setVisibility(View.VISIBLE);
+	}
+	
+
+	public void showStopInfo(String lastStop) 
+	{
+		stopInfo.setText(lastStop);
+		stopInfo.setVisibility(View.VISIBLE);
 	}
 	
 
@@ -143,6 +176,7 @@ public class Main extends Activity
 	{
 		statusUpdate.setText(statusText);
 		disconnect.setVisibility(View.VISIBLE);
+		cbDubious.setVisibility(View.VISIBLE);
 		turnOn.setVisibility(View.GONE);
 	}
 
@@ -151,6 +185,7 @@ public class Main extends Activity
 	{
 		statusUpdate.setText("Bluetooth is not on");
 		disconnect.setVisibility(View.GONE);
+		cbDubious.setVisibility(View.GONE);
 		turnOn.setVisibility(View.VISIBLE);
 	}
 	
@@ -173,4 +208,5 @@ public class Main extends Activity
         }
         return super.onOptionsItemSelected(item);
     }
+
 }

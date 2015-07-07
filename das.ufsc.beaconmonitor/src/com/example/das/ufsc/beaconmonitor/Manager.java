@@ -20,15 +20,17 @@ public class Manager
 {
 	private BluetoothAdapter btAdapter;
 	private CommunicationService comunicationService;
+	//private CommService comunicationService;
 	private Main ui;
 	
-	//TODO remover
 	private String beaconMac;
 	
 	private Date startDiscoveryTS;
 	private Map<String, ConnectionPerformanceInfo> currentConnectedBeacons;
 	
 	private int operationMode;
+	private CallWaiter callWaiterThread;
+
 	
 	private final Handler mHandler = new Handler() 
 	{
@@ -51,10 +53,34 @@ public class Manager
 			{
 				beaconMac =(String) msg.obj;
 				setConnectionDate(beaconMac);
-				ui.showToast("conectado ao beacon ");
 				
 				break;
 			}
+			case CommunicationService.MSG_TYPE_EXCEPTION:
+			{
+				Exception errorMessage =(Exception) msg.obj;
+				ui.showError(errorMessage);
+				break;
+			}
+			case CommunicationService.MSG_TYPE_CONNECT_EXCEPTION:
+			{
+				Exception errorMessage =(Exception) msg.obj;
+				ui.showError(errorMessage);
+				
+				callWaiterThread = new CallWaiter(3000);
+				callWaiterThread.start();
+
+				break;
+			}
+			
+			case CommunicationService.MSG_TYPE_CONNECTION_CLOSED:
+			{
+				//ui.showError(new Exception("Connection reset by peer"));
+				
+				break;
+			}
+
+
 			}
 		}
 	};
@@ -95,23 +121,38 @@ public class Manager
 					
 					int tic = json.getInt(BeaconDefaults.TIC_KEY);
 					
-					int lineId = json.getInt(BeaconDefaults.TIC_LINEID_KEY);
-					String lineName = json.getString(BeaconDefaults.TIC_LINENM_KEY);
-					String lastStop = json.getString(BeaconDefaults.TIC_LASTSTOPNM_KEY);
-	
-					this.ui.showBeaconInfo("Following Beacon for line " + lineName +"(" + lineId + ")");
-					this.ui.showStopInfo(lastStop);
-
-					//interrmpe conexao
-					sendAckMessage();
-
-					prepareNewCall(tic);
+					if(tic < 0)
+					{
+						comunicationService.stop();
+						//btAdapter.disable();
+						//btAdapter.enable();
+					}
+					else
+					{
+						int lineId = json.getInt(BeaconDefaults.TIC_LINEID_KEY);
+						String lineName = json.getString(BeaconDefaults.TIC_LINENM_KEY);
+						String lastStop = json.getString(BeaconDefaults.TIC_LASTSTOPNM_KEY);
+						
+						this.ui.showBeaconInfo("Following Beacon for line " + lineName +"(" + lineId + ")");
+						this.ui.showStopInfo(lastStop);
+						
+						//interrmpe conexao
+						sendAckMessage();
+						
+						ui.showNextCallInfo("Next call in " + tic + "s");
+						prepareNewCall(tic);						
+					}
+					
 				}
 			} 
 			catch (JSONException e) 
 			{
-				e.printStackTrace();
-			}
+				ui.showError(e);
+			} 
+			catch (IOException e) 
+			{
+				ui.showError(e);
+			} 
 		}
 	}
 	
@@ -125,13 +166,13 @@ public class Manager
 			
 			String jsonString = BeaconDefaults.formatJson(btAdapter.getAddress(), getOppMode(), connPerformanceInfo);
 			
-			comunicationService.sendMessage(jsonString);	
-				
+			comunicationService.sendMessage(jsonString);
+			
+			//new BTInterruptor().start();
 		} 
 		catch (IOException e) 
 		{
-
-			e.printStackTrace();
+			ui.showError(e);
 		}
 
 	}
@@ -146,10 +187,10 @@ public class Manager
 
 	private void prepareNewCall(int tic)
 	{
-		CallWaiter callWaiter = new CallWaiter(tic * 1000);
-		callWaiter.start();
+		this.callWaiterThread = new CallWaiter(tic * 1000);
+		this.callWaiterThread.start();
 		
-		BTInterruptor interrupt = new BTInterruptor();
+		//BTInterruptor interrupt = new BTInterruptor();
 		//interrupt.start();
 	}
 	
@@ -160,6 +201,9 @@ public class Manager
 		{
 			btAdapter.enable();
 		}
+		
+		if(beaconMac == null) return;
+		
 		BluetoothDevice beaconDevice = btAdapter.getRemoteDevice(beaconMac);
 		try 
 		{
@@ -169,7 +213,7 @@ public class Manager
 		} 
 		catch (IOException e) 
 		{
-			ui.showToast(e.getMessage());
+			ui.showError(e);
 		}
 	}
 	
@@ -178,10 +222,7 @@ public class Manager
 		//record start discovery
 		this.startDiscoveryTS = new Date();
 		//start discovery
-		if(btAdapter.startDiscovery())
-		{
-			ui.showToast("Executing discovery");
-		}
+		btAdapter.startDiscovery();
 	}
 
 
@@ -204,15 +245,21 @@ public class Manager
 	{
 		try
 		{
-			//para o servico de comunicacao
-			comunicationService.stop();
+			//cancel call waiter thread
+			if(this.callWaiterThread != null)
+			{
+				this.callWaiterThread.cancel();
+			}
 			
-			//desliga o bluetooth
+			//stop communication service
+			//comunicationService.stop();
+			
+			//turn off bluetooth
 			btAdapter.disable();
 		}
 		catch(Exception e)
 		{
-			ui.showToast(e.getMessage());
+			ui.showError(e);
 		}
 		
 	}
@@ -221,21 +268,27 @@ public class Manager
 
 	public void onBluetoothOn() 
 	{
-		//inicia o servico de comunicacao
-		comunicationService.start();
-		
-		String name = btAdapter.getName();
-		String statusText = "Device name: " + name;		
-		
-		ui.showBluetoothProperties(statusText);	
-		
-		startDiscovery();
+		//start communication service
+		try 
+		{
+			//comunicationService.start();
+			String name = btAdapter.getName();
+			String statusText = "Device name: " + name;		
+			ui.showBluetoothProperties(statusText);	
+			startDiscovery();
+		} 
+		catch (Exception e) 
+		{
+			ui.showError(e);
+		}
 	}
 
 
 
 	public void connect(BluetoothDevice remoteDevice) 
 	{
+		if(beaconMac != null) return;
+		
 		if(isBeacon(remoteDevice))
 		{
 			try 
@@ -260,7 +313,7 @@ public class Manager
 			} 
 			catch (IOException e)
 			{
-				ui.showToast(e.getMessage());
+				ui.showError(e);
 			}	
 		}
 	}
@@ -281,6 +334,7 @@ public class Manager
 	private void setConnectionDate(String beaconMac)
 	{
 		ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(beaconMac);
+		if (connPerformanceInfo == null) return;
 		
 		//keep the connection time
 		if(connPerformanceInfo.isFirstConnection())
@@ -317,7 +371,7 @@ public class Manager
 		{
 			try 
 			{
-				sleep(2 * 1000);
+				sleep(3 * 1000);
 			} 
 			catch (InterruptedException e) 
 			{
@@ -325,12 +379,14 @@ public class Manager
 			}
 	
 			btAdapter.disable();
+			btAdapter.enable();
 		}
 	}
 	
 	private class CallWaiter extends Thread
 	{
 		private long timeToWait;
+		private boolean running = true;
 		
 		public CallWaiter(long time)
 		{
@@ -338,18 +394,35 @@ public class Manager
 			this.timeToWait = time;
 		}
 		
+		public void cancel()
+		{
+			this.running = false;
+		}
+		
 		public void run()
 		{
-			try 
+			while(timeToWait > 0 && this.running)
 			{
-				sleep(timeToWait);
-			} 
-			catch (InterruptedException e) 
-			{
-				e.printStackTrace();
+				//ui.de
+				ui.showNextCallInfo("Next call in " + timeToWait/1000 + "s");
+				
+				try 
+				{
+					sleep(1000);
+				} 
+				catch (InterruptedException e) 
+				{
+					e.printStackTrace();
+				}
+				timeToWait = timeToWait - 1000;
 			}
+			
 		
-			callBeacon();
+			ui.showNextCallInfo("");
+			if(this.running)
+			{
+				callBeacon();
+			}
 		}
 	}
 

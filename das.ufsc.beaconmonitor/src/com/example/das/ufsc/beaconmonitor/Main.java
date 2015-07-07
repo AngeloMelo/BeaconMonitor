@@ -7,7 +7,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.text.method.ScrollingMovementMethod;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -19,13 +21,14 @@ import android.widget.TextView;
 
 public class Main extends Activity 
 {
-
 	private Manager manager;
 	private Button turnOn;
 	private Button disconnect;
 	private TextView statusUpdate;
 	private TextView beaconInfo;
 	private TextView stopInfo;
+	private TextView errorMessage;
+	private TextView nextCallInfo;
 	private CheckBox cbDubious;
 	
 	BroadcastReceiver bluetoothState = new BroadcastReceiver()
@@ -39,23 +42,23 @@ public class Main extends Activity
 			{
 			case(BluetoothAdapter.STATE_TURNING_ON):
 			{
-				showToast("Bluetooth turning On");
+				//showToast("Bluetooth turning On");
 				break;
 			}
 			case(BluetoothAdapter.STATE_ON):
 			{
-				showToast("Bluetooth On");
+				//showToast("Bluetooth On");
 				manager.onBluetoothOn();
 				break;
 			}
 			case(BluetoothAdapter.STATE_TURNING_OFF):
 			{
-				showToast("Bluetooth turning Off");
+				//showToast("Bluetooth turning Off");
 				break;
 			}
 			case(BluetoothAdapter.STATE_OFF):
 			{
-				showToast("Bluetooth Off");
+				//showToast("Bluetooth Off");
 				hideBluetoothProperties();
 				break;
 			}
@@ -82,6 +85,9 @@ public class Main extends Activity
 		statusUpdate = (TextView) findViewById(R.id.result);
 		beaconInfo = (TextView) findViewById(R.id.beaconInfo);
 		stopInfo = (TextView) findViewById(R.id.stopInfo);
+		errorMessage = (TextView) findViewById(R.id.errorMessage);
+		nextCallInfo = (TextView) findViewById(R.id.nextCallInfo);
+		
 		turnOn = (Button) findViewById(R.id.turnonBtn);
 		disconnect = (Button) findViewById(R.id.disconnectBtn);		
 		cbDubious = (CheckBox)findViewById(R.id.cbDubious);		
@@ -90,6 +96,14 @@ public class Main extends Activity
 		cbDubious.setVisibility(View.GONE);
 		beaconInfo.setVisibility(View.GONE);
 		stopInfo.setVisibility(View.GONE);
+
+		errorMessage.setVisibility(View.GONE);
+		errorMessage.setTextColor(Color.RED);
+		errorMessage.setMovementMethod(new ScrollingMovementMethod());
+		
+		nextCallInfo.setVisibility(View.GONE);
+		nextCallInfo.setTextColor(Color.BLUE);
+		nextCallInfo.setText("");
 		
 		//cria actionListeners para o botao turnOn
 		turnOn.setOnClickListener(
@@ -115,12 +129,17 @@ public class Main extends Activity
 			@Override
 			public void onClick(View v)
 			{
+				manager.stopBeacon();
 				disconnect.setVisibility(View.GONE);
 				cbDubious.setVisibility(View.GONE);
 				beaconInfo.setVisibility(View.GONE);
 				stopInfo.setVisibility(View.GONE);
+				errorMessage.setText("");
+				errorMessage.setVisibility(View.GONE);
 				turnOn.setVisibility(View.VISIBLE);
-				manager.stopBeacon();
+				
+				nextCallInfo.setText("");
+				nextCallInfo.setVisibility(View.GONE);
 			}
 		});
 		
@@ -154,9 +173,19 @@ public class Main extends Activity
 	};
 	
 	
-	public void showToast(String msg)
+	public void showError(Exception e)
 	{
+		CharSequence oldMsg = this.errorMessage.getText();
+		String msg = "Error: " + e.getMessage() + "\nST: ";
+		for(StackTraceElement stel :  e.getStackTrace())
+		{
+			msg = msg + " " + stel.toString() + "\n";
+		}
+		msg = msg + "\n" + oldMsg;
+		this.errorMessage.setText(msg);
+		this.errorMessage.setVisibility(View.VISIBLE);
 	}
+	
 	
 	public void showBeaconInfo(String msg)
 	{
@@ -178,6 +207,27 @@ public class Main extends Activity
 		disconnect.setVisibility(View.VISIBLE);
 		cbDubious.setVisibility(View.VISIBLE);
 		turnOn.setVisibility(View.GONE);
+	}
+	
+	
+	//public void showNextCallInfo(String msg)
+	//{
+	//	nextCallInfo.setText(msg);
+	//	nextCallInfo.setVisibility(View.VISIBLE);
+	//}
+	
+	
+	public void showNextCallInfo(final String msg)
+	{
+		final TextView text = (TextView) Main.this.findViewById(R.id.nextCallInfo);
+		Main.this.runOnUiThread(new Runnable() 
+        {
+             public void run() 
+             {
+            	 text.setText(msg);
+            	 text.setVisibility(View.VISIBLE);
+             }
+        });
 	}
 
 	
@@ -208,5 +258,4 @@ public class Main extends Activity
         }
         return super.onOptionsItemSelected(item);
     }
-
 }

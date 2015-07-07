@@ -18,44 +18,41 @@ public class CommunicationService
 	public static final int MSG_TYPE_REFRESH_SLAVELIST = 1;
 	public static final int MSG_TYPE_STOP_DISCOVERY = 2;
 	public static final int MSG_TYPE_CONNECTED_TO_BEACON = 3;
+	public static final int MSG_TYPE_EXCEPTION = 4;
+	public static final int MSG_TYPE_CONNECT_EXCEPTION = 5;
+	public static final int MSG_TYPE_CONNECTION_CLOSED = 6;
 	
 	private ReadWriteThread mReadWriteThread;
 	private ConnectThread mConnectThread;
-	private BluetoothAdapter mAdapter;
 	private final Handler mHandler;
 	
 	
 	public CommunicationService(Handler handler) 
 	{
-        mAdapter = BluetoothAdapter.getDefaultAdapter();
         mHandler = handler;
     }
 	
 	
-	public synchronized void start() 
+	public synchronized void stop() throws IOException
 	{
-        // Cancel any thread attempting to make a connection
-        if (mConnectThread != null) {mConnectThread.cancel(); mConnectThread = null;}
-
-        // Cancel any thread currently running a connection
-        if (mReadWriteThread != null) {mReadWriteThread.cancel(); mReadWriteThread = null;}
-    }
-	
-	
-	
-	public synchronized void stop()
-	{
-		if (mReadWriteThread != null) {mReadWriteThread.cancel(); mReadWriteThread = null;}
 		if (mConnectThread != null) {mConnectThread.cancel(); mConnectThread = null;}
+		if (mReadWriteThread != null) {mReadWriteThread.cancel(); mReadWriteThread = null;}
 	}
 	
+	public synchronized void shutDown() throws IOException
+	{
+		if (mConnectThread != null) {mConnectThread.cancel(); mConnectThread = null;}
+		if (mReadWriteThread != null) {mReadWriteThread.cancel(); mReadWriteThread = null;}
+	}
+
 	
 	/**
      * Start the ConnectedThread to begin managing a Bluetooth connection
      * @param socket  The BluetoothSocket on which the connection was made
      * @param device  The BluetoothDevice that has been connected
+	 * @throws IOException 
      */
-	public synchronized void startTransmission(BluetoothSocket socket) 
+	public synchronized void startTransmission(BluetoothSocket socket) throws IOException 
     {
 		BluetoothDevice remoteDevice = socket.getRemoteDevice();
         // Cancel any thread currently running a connection
@@ -74,8 +71,11 @@ public class CommunicationService
         // Cancel any thread currently running a connection
         if (mReadWriteThread != null) {mReadWriteThread.cancel(); mReadWriteThread = null;}
 
+        // Cancel discovery because it will slow down the connection
+        BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
+        
         // Start the thread to connect with the given device
-        mConnectThread = new ConnectThread(device, mAdapter);
+        mConnectThread = new ConnectThread(device);
         mConnectThread.start();
     }
     
@@ -89,21 +89,13 @@ public class CommunicationService
     }
     
 	
-	/*public void stopConnectionThreads() 
-	{
-		if (mConnectThread != null) {mConnectThread.cancel(); mConnectThread = null;}
-	}
-	*/
-	
 	private class ConnectThread extends Thread 
 	{
 		private final BluetoothSocket mmSocket;
-	    private final BluetoothAdapter mBluetoothAdapter;
 	    private boolean running = true;
 	    
-	    public ConnectThread(BluetoothDevice device, BluetoothAdapter bluetoothAdapter) throws IOException 
+	    public ConnectThread(BluetoothDevice device) throws IOException 
 	    {
-	    	this.mBluetoothAdapter = bluetoothAdapter;
 	        // Use a temporary object that is later assigned to mmSocket, because mmSocket is final
 	        BluetoothSocket tmp = null;
 	        
@@ -114,27 +106,46 @@ public class CommunicationService
 	    public void run() 
 	    {
 	    	if(!running) return;
-	    	
-	        // Cancel discovery because it will slow down the connection
-	        mBluetoothAdapter.cancelDiscovery();
 	 
 	        try 
 	        {
 	            // Connect the device through the socket. This will block until it succeeds or throws an exception
+	        	/**
+	        	 * Upon this call, the system will perform an SDP lookup on the remote device in order to match the UUID. 
+	        	 * If the lookup is successful and the remote device accepts the connection, it will share the RFCOMM channel
+	        	 *  to use during the connection and connect() will return. This method is a blocking call. If, for any reason, 
+	        	 *  the connection fails or the connect() method times out (after about 12 seconds), then it will throw an exception.
+	        	 *  Because connect() is a blocking call, this connection procedure should always be performed in a thread separate 
+	        	 *  from the main activity thread.
+	        	 */
 	            mmSocket.connect();
 	        } 
 	        catch (IOException connectException) 
 	        {
+	        	mHandler.obtainMessage(MSG_TYPE_CONNECT_EXCEPTION, connectException).sendToTarget();
+	        	
 	            // Unable to connect; close the socket and get out
-	            try {
+	            /*try 
+	            {
 	                mmSocket.close();
 	                throw connectException;
-	            } catch (IOException closeException) { }
-	            return;
+	            } 
+	            catch (IOException closeException) 
+	            { 
+	            	mHandler.obtainMessage(MSG_TYPE_EXCEPTION, closeException).sendToTarget();
+	            }
+	            return;*/
 	        }
 	 
-	        // Do work to manage the connection (in a separate thread)
-	        startTransmission(mmSocket);
+	        try
+	        {
+	        	// Do work to manage the connection (in a separate thread)
+	        	startTransmission(mmSocket);
+	        }
+	        catch(IOException e)
+	        {
+	        	mHandler.obtainMessage(MSG_TYPE_EXCEPTION, e).sendToTarget();
+	        }
 	    }
 	    
 	    public void cancel()
@@ -150,6 +161,7 @@ public class CommunicationService
 		private final BluetoothSocket mmSocket;
 	    private final InputStream mmInStream;
 	    private final OutputStream mmOutStream;
+	    private volatile boolean running = true;
 	 
 	    public ReadWriteThread(BluetoothSocket socket) 
 	    {
@@ -176,7 +188,7 @@ public class CommunicationService
 	        int bytes; 
 	 
 	        // Keep listening to the InputStream until an exception occurs
-	        while (true) 
+	        while (this.running) 
 	        {
 	            try 
 	            {
@@ -188,6 +200,16 @@ public class CommunicationService
 	            } 
 	            catch (IOException e) 
 	            {
+	            	mHandler.obtainMessage(MSG_TYPE_CONNECTION_CLOSED, null).sendToTarget();
+	            	
+	            	try {
+						
+	            		shutDown();
+						
+					} catch (IOException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
 	                break;
 	            }
 	        }
@@ -200,31 +222,45 @@ public class CommunicationService
 	    }
 	 
 	    /* Call this from the main activity to shutdown the connection */
-	    public void cancel() 
+	    public void cancel() throws IOException
 	    {
+	    	if(! running) return;
+	    	
 	        try 
 	        { 
 	        	if(mmInStream!= null)
 	        	{
 	        		mmInStream.close(); 
 	        	}
-	        	
+	        }
+	        catch (IOException e) 
+	        {
+	        	mHandler.obtainMessage(MSG_TYPE_CONNECT_EXCEPTION, e).sendToTarget();
+	        }
+
+	        try 
+	        { 
 	        	if(mmOutStream != null)
 	        	{
 	        		mmOutStream.close();
-	        	} 
-	        } 
+	        	}
+	        }
 	        catch (IOException e) 
 	        {
-	        	e.printStackTrace();
+	        	mHandler.obtainMessage(MSG_TYPE_CONNECT_EXCEPTION, e).sendToTarget();
 	        }
+
 	        try 
 	        { 
-	        	mmSocket.close();
-	        } 
+        		mmSocket.close();
+	        }
 	        catch (IOException e) 
+	        {
+	        	mHandler.obtainMessage(MSG_TYPE_CONNECT_EXCEPTION, e).sendToTarget();
+	        }
+	        finally
 	        { 
-	        	e.printStackTrace();
+	        	this.running = false;
 	        }
 	    }
 	}

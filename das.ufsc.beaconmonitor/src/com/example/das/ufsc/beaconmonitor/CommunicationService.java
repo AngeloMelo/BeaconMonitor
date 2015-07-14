@@ -33,13 +33,7 @@ public class CommunicationService
     }
 	
 	
-	public synchronized void stop() throws IOException
-	{
-		if (mConnectThread != null) {mConnectThread.cancel(); mConnectThread = null;}
-		if (mReadWriteThread != null) {mReadWriteThread.cancel(); mReadWriteThread = null;}
-	}
-	
-	public synchronized void shutDown() throws IOException
+	public void shutDown() throws IOException
 	{
 		if (mConnectThread != null) {mConnectThread.cancel(); mConnectThread = null;}
 		if (mReadWriteThread != null) {mReadWriteThread.cancel(); mReadWriteThread = null;}
@@ -52,7 +46,7 @@ public class CommunicationService
      * @param device  The BluetoothDevice that has been connected
 	 * @throws IOException 
      */
-	public synchronized void startTransmission(BluetoothSocket socket) throws IOException 
+	private void startTransmission(BluetoothSocket socket) throws IOException 
     {
 		BluetoothDevice remoteDevice = socket.getRemoteDevice();
         // Cancel any thread currently running a connection
@@ -66,7 +60,7 @@ public class CommunicationService
     }    
     
 	
-    public synchronized void connect(BluetoothDevice device) throws IOException 
+    public void connect(BluetoothDevice device) throws IOException 
     {   	
         // Cancel any thread currently running a connection
         if (mReadWriteThread != null) {mReadWriteThread.cancel(); mReadWriteThread = null;}
@@ -80,7 +74,7 @@ public class CommunicationService
     }
     
 
-	public synchronized void sendMessage(String msg) throws IOException
+	public void sendMessage(String msg) throws IOException
     {
 		if(mReadWriteThread != null)
     	{
@@ -122,19 +116,17 @@ public class CommunicationService
 	        } 
 	        catch (IOException connectException) 
 	        {
-	        	mHandler.obtainMessage(MSG_TYPE_CONNECT_EXCEPTION, connectException).sendToTarget();
-	        	
 	            // Unable to connect; close the socket and get out
-	            /*try 
+	            try 
 	            {
 	                mmSocket.close();
-	                throw connectException;
+	                mHandler.obtainMessage(MSG_TYPE_CONNECT_EXCEPTION, connectException).sendToTarget();
 	            } 
 	            catch (IOException closeException) 
 	            { 
 	            	mHandler.obtainMessage(MSG_TYPE_EXCEPTION, closeException).sendToTarget();
 	            }
-	            return;*/
+	            return;
 	        }
 	 
 	        try
@@ -170,10 +162,15 @@ public class CommunicationService
 	        OutputStream tmpOut = null;
 	 
 	        // Get the input and output streams, using temp objects because member streams are final
-	        try {
+	        try 
+	        {
 	            tmpIn = socket.getInputStream();
 	            tmpOut = socket.getOutputStream();
-	        } catch (IOException e) { }
+	        } 
+	        catch (IOException e) 
+	        { 
+	        	mHandler.obtainMessage(MSG_TYPE_EXCEPTION, e).sendToTarget();
+	        }
 	 
 	        mmInStream = tmpIn;
 	        mmOutStream = tmpOut;
@@ -182,7 +179,7 @@ public class CommunicationService
 	    public void run() 
 	    {
 	    	// buffer store for the stream
-	        byte[] buffer = new byte[1024];  
+	        byte[] buffer = new byte[2048];  
 
 	        // bytes returned from read()
 	        int bytes; 
@@ -195,19 +192,22 @@ public class CommunicationService
 	                // Read from the InputStream
 	                bytes = mmInStream.read(buffer);
 	                
-	                // Send the obtained bytes to the UI activity
-	                mHandler.obtainMessage(MSG_TYPE_MESSAGE_READ, bytes, -1, buffer).sendToTarget();
+	                if(bytes > 0)
+	                {
+	                	// Send the obtained bytes to the UI activity
+	                	mHandler.obtainMessage(MSG_TYPE_MESSAGE_READ, bytes, -1, buffer).sendToTarget();	                	
+	                }
 	            } 
 	            catch (IOException e) 
 	            {
 	            	mHandler.obtainMessage(MSG_TYPE_CONNECTION_CLOSED, null).sendToTarget();
 	            	
-	            	try {
-						
+	            	try 
+	            	{
 	            		shutDown();
-						
-					} catch (IOException e1) {
-						// TODO Auto-generated catch block
+					} 
+	            	catch (IOException e1) 
+					{
 						e1.printStackTrace();
 					}
 	                break;

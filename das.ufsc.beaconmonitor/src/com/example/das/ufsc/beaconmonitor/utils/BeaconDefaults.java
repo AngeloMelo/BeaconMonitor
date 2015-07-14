@@ -46,7 +46,8 @@ public class BeaconDefaults
 	{
 		//setting up the known device list:
 		beaconList = new ArrayList<String>();
-		beaconList.add("9C:AD:97:FD:DB:52");
+		beaconList.add("9C:AD:97:FD:DB:52");//pc
+		beaconList.add("18:46:17:3E:D6:D6");//my android
 	}
 	
 	public static boolean checkBeacon(String mac)

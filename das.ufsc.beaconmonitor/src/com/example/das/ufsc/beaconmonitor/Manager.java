@@ -20,7 +20,6 @@ public class Manager
 {
 	private BluetoothAdapter btAdapter;
 	private CommunicationService comunicationService;
-	//private CommService comunicationService;
 	private Main ui;
 	
 	private String beaconMac;
@@ -30,6 +29,7 @@ public class Manager
 	
 	private int operationMode;
 	private CallWaiter callWaiterThread;
+	private boolean running = false;
 
 	
 	private final Handler mHandler = new Handler() 
@@ -46,7 +46,7 @@ public class Manager
 				// construct a string from the valid bytes in the buffer
 				String readMessage = new String(readBuf, 0, msg.arg1);
 				
-				readTic(readMessage);
+				readTic(readMessage, true);
 				break;
 			}
 			case CommunicationService.MSG_TYPE_CONNECTED_TO_BEACON:
@@ -65,10 +65,13 @@ public class Manager
 			case CommunicationService.MSG_TYPE_CONNECT_EXCEPTION:
 			{
 				Exception errorMessage =(Exception) msg.obj;
-				ui.showError(errorMessage);
-				
-				callWaiterThread = new CallWaiter(3000);
-				callWaiterThread.start();
+
+				if(isRunning())
+				{
+					ui.showError(errorMessage);
+					callWaiterThread = new CallWaiter(3000);
+					callWaiterThread.start();
+				}
 
 				break;
 			}
@@ -98,10 +101,18 @@ public class Manager
 		init();
 	}
 	
+	
+	private boolean isRunning()
+	{
+		return this.isRunning();
+	}
+	
+	
 	private void init()
 	{
 		this.beaconMac = null;
 		this.startDiscoveryTS = null;
+		this.running = false;
 		this.currentConnectedBeacons = new HashMap<String, ConnectionPerformanceInfo>();
 		this.operationMode = BeaconDefaults.OPP_MODE_AUTHENTIC;
 	}
@@ -123,7 +134,7 @@ public class Manager
 					
 					if(tic < 0)
 					{
-						comunicationService.stop();
+						comunicationService.shutDown();
 						//btAdapter.disable();
 						//btAdapter.enable();
 					}
@@ -153,6 +164,49 @@ public class Manager
 			{
 				ui.showError(e);
 			} 
+		}
+	}
+	
+	private void readTic(String msgRead, boolean noCall) 
+	{
+		if(msgRead != null)
+		{						
+			try 
+			{
+				JSONObject json = new JSONObject(msgRead);
+				if(json.has(BeaconDefaults.TIC_KEY))
+				{
+					ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(beaconMac);
+					connPerformanceInfo.setLastTicReceivedTs(new Date());
+					
+					int tic = json.getInt(BeaconDefaults.TIC_KEY);
+					
+					int lineId = json.getInt(BeaconDefaults.TIC_LINEID_KEY);
+					String lineName = json.getString(BeaconDefaults.TIC_LINENM_KEY);
+					String lastStop = json.getString(BeaconDefaults.TIC_LASTSTOPNM_KEY);
+					
+					this.ui.showBeaconInfo("Following Beacon for line " + lineName +"(" + lineId + ")");
+					this.ui.showStopInfo(lastStop);
+					
+					//interrmpe conexao
+					sendAckMessage();
+					
+					if(tic > 0)
+					{
+						ui.showNextCallInfo("Next call in " + tic + "s");
+						prepareNewCall(tic);						
+					}
+					else
+					{
+						ui.showNextCallInfo("Final stop");
+					}
+					
+				}
+			} 
+			catch (JSONException e) 
+			{
+				ui.showError(e);
+			}
 		}
 	}
 	
@@ -243,6 +297,7 @@ public class Manager
 
 	public void stopBeacon() 
 	{
+		this.running = false;
 		try
 		{
 			//cancel call waiter thread
@@ -261,7 +316,6 @@ public class Manager
 		{
 			ui.showError(e);
 		}
-		
 	}
 
 
@@ -276,6 +330,7 @@ public class Manager
 			String statusText = "Device name: " + name;		
 			ui.showBluetoothProperties(statusText);	
 			startDiscovery();
+			this.running = true;
 		} 
 		catch (Exception e) 
 		{
@@ -394,7 +449,7 @@ public class Manager
 			this.timeToWait = time;
 		}
 		
-		public void cancel()
+		public synchronized void cancel()
 		{
 			this.running = false;
 		}

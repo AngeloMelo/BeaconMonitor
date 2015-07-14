@@ -7,22 +7,48 @@
         android:id="@+id/result"
         android:layout_width="226dp"
         android:layout_height="wrap_content"
-        android:text="Bluetooth Test" />
-    
-    
-    <TextView
-        android:id="@+id/message"
-        android:layout_width="226dp"
-        android:layout_height="wrap_content"
-        android:text="Bluetooth Test" />
+        android:text="Bluetooth is not on - 20150714.3" />
+
     
 
-   
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" >
+
+		<TextView
+		    android:id="@+id/beaconInfo"
+		    android:layout_width="wrap_content"
+		    android:layout_height="wrap_content"
+		    android:layout_weight="0.95"
+		    android:text="" />
+
+        <TextView
+            android:id="@+id/nextCallInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="0.12"
+            android:text=""
+            android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/stopInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="" />
+
     <Button
         android:id="@+id/turnonBtn"
         android:layout_width="227dp"
         android:layout_height="wrap_content"
         android:text="Turn On" />
+
+    <CheckBox
+        android:id="@+id/cbDubious"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Dubious Mode" />
 
     <Button
         android:id="@+id/disconnectBtn"
@@ -30,10 +56,13 @@
         android:layout_height="wrap_content"
         android:text="Turn Off" />
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" >
 
-    </LinearLayout>
-    
+    <TextView
+        android:id="@+id/errorMessage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.71"
+        android:text=""
+        android:textAppearance="?android:attr/textAppearanceSmall" />
+
 </LinearLayout>

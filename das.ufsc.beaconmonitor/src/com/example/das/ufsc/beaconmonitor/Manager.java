@@ -29,7 +29,8 @@ public class Manager
 	
 	private int operationMode;
 	private CallWaiter callWaiterThread;
-	private boolean running = false;
+	private volatile boolean running = false;
+	private int attempts = 0;
 
 	
 	private final Handler mHandler = new Handler() 
@@ -46,7 +47,7 @@ public class Manager
 				// construct a string from the valid bytes in the buffer
 				String readMessage = new String(readBuf, 0, msg.arg1);
 				
-				readTic(readMessage, true);
+				readTic(readMessage);
 				break;
 			}
 			case CommunicationService.MSG_TYPE_CONNECTED_TO_BEACON:
@@ -64,14 +65,14 @@ public class Manager
 			}
 			case CommunicationService.MSG_TYPE_CONNECT_EXCEPTION:
 			{
-				Exception errorMessage =(Exception) msg.obj;
-
-				if(isRunning())
+				String error = "Conn refused. Attempt: " + (++attempts);
+				ui.showWarning(error);
+				if(callWaiterThread != null)
 				{
-					ui.showError(errorMessage);
-					callWaiterThread = new CallWaiter(3000);
-					callWaiterThread.start();
+					callWaiterThread.cancel();
 				}
+				callWaiterThread = new CallWaiter(5000);
+				callWaiterThread.start();
 
 				break;
 			}
@@ -102,7 +103,7 @@ public class Manager
 	}
 	
 	
-	private boolean isRunning()
+	private synchronized boolean isRunning()
 	{
 		return this.isRunning();
 	}
@@ -113,11 +114,13 @@ public class Manager
 		this.beaconMac = null;
 		this.startDiscoveryTS = null;
 		this.running = false;
+		this.attempts = 0;
 		this.currentConnectedBeacons = new HashMap<String, ConnectionPerformanceInfo>();
 		this.operationMode = BeaconDefaults.OPP_MODE_AUTHENTIC;
 	}
 
 
+	
 	private void readTic(String msgRead) 
 	{
 		if(msgRead != null)
@@ -132,13 +135,11 @@ public class Manager
 					
 					int tic = json.getInt(BeaconDefaults.TIC_KEY);
 					
-					if(tic < 0)
+					if(tic == BeaconDefaults.INT_CLOSE_CONNECTION)
 					{
 						comunicationService.shutDown();
-						//btAdapter.disable();
-						//btAdapter.enable();
 					}
-					else
+					else 
 					{
 						int lineId = json.getInt(BeaconDefaults.TIC_LINEID_KEY);
 						String lineName = json.getString(BeaconDefaults.TIC_LINENM_KEY);
@@ -146,14 +147,21 @@ public class Manager
 						
 						this.ui.showBeaconInfo("Following Beacon for line " + lineName +"(" + lineId + ")");
 						this.ui.showStopInfo(lastStop);
-						
-						//interrmpe conexao
-						sendAckMessage();
-						
-						ui.showNextCallInfo("Next call in " + tic + "s");
-						prepareNewCall(tic);						
+						this.ui.showWarning("");
+					
+						if(tic == BeaconDefaults.INT_NO_RECALL)
+						{
+							ui.showNextCallInfo("Final stop");
+						}
+						else
+						{
+							ui.showNextCallInfo("Next call in " + tic + "s");
+							prepareNewCall(tic);
+						}
 					}
 					
+					//send command to close this connection on the peer
+					sendAckMessage();
 				}
 			} 
 			catch (JSONException e) 
@@ -161,49 +169,6 @@ public class Manager
 				ui.showError(e);
 			} 
 			catch (IOException e) 
-			{
-				ui.showError(e);
-			} 
-		}
-	}
-	
-	private void readTic(String msgRead, boolean noCall) 
-	{
-		if(msgRead != null)
-		{						
-			try 
-			{
-				JSONObject json = new JSONObject(msgRead);
-				if(json.has(BeaconDefaults.TIC_KEY))
-				{
-					ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(beaconMac);
-					connPerformanceInfo.setLastTicReceivedTs(new Date());
-					
-					int tic = json.getInt(BeaconDefaults.TIC_KEY);
-					
-					int lineId = json.getInt(BeaconDefaults.TIC_LINEID_KEY);
-					String lineName = json.getString(BeaconDefaults.TIC_LINENM_KEY);
-					String lastStop = json.getString(BeaconDefaults.TIC_LASTSTOPNM_KEY);
-					
-					this.ui.showBeaconInfo("Following Beacon for line " + lineName +"(" + lineId + ")");
-					this.ui.showStopInfo(lastStop);
-					
-					//interrmpe conexao
-					sendAckMessage();
-					
-					if(tic > 0)
-					{
-						ui.showNextCallInfo("Next call in " + tic + "s");
-						prepareNewCall(tic);						
-					}
-					else
-					{
-						ui.showNextCallInfo("Final stop");
-					}
-					
-				}
-			} 
-			catch (JSONException e) 
 			{
 				ui.showError(e);
 			}
@@ -232,7 +197,6 @@ public class Manager
 	}
 
 
-	//TODO build this method
 	private int getOppMode() 
 	{
 		return this.operationMode;
@@ -241,6 +205,11 @@ public class Manager
 
 	private void prepareNewCall(int tic)
 	{
+		if(this.callWaiterThread != null)
+		{
+			this.callWaiterThread.cancel();
+		}
+		
 		this.callWaiterThread = new CallWaiter(tic * 1000);
 		this.callWaiterThread.start();
 		
@@ -307,7 +276,7 @@ public class Manager
 			}
 			
 			//stop communication service
-			//comunicationService.stop();
+			comunicationService.shutDown();
 			
 			//turn off bluetooth
 			btAdapter.disable();

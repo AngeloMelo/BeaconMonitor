@@ -187,6 +187,13 @@ public class Main extends Activity
 	}
 	
 	
+	public void showWarning(String msg)
+	{
+		this.errorMessage.setText(msg);
+		this.errorMessage.setVisibility(View.VISIBLE);
+	}
+	
+	
 	public void showBeaconInfo(String msg)
 	{
 		beaconInfo.setText(msg);

@@ -35,6 +35,10 @@ public class BeaconDefaults
 	//OPP MODES
 	public static final int OPP_MODE_AUTHENTIC = 0;
 	public static final int OPP_MODE_DUBIOUS = 1;
+	
+	//INTERRUPT MODES
+	public static final int INT_CLOSE_CONNECTION = -1;
+	public static final int INT_NO_RECALL = -2;
 
 	
 

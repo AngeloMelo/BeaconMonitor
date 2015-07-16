@@ -46,7 +46,7 @@ public class CommunicationService
      * @param device  The BluetoothDevice that has been connected
 	 * @throws IOException 
      */
-	private void startTransmission(BluetoothSocket socket) throws IOException 
+	private synchronized void startTransmission(BluetoothSocket socket) throws IOException 
     {
 		BluetoothDevice remoteDevice = socket.getRemoteDevice();
         // Cancel any thread currently running a connection
@@ -140,7 +140,7 @@ public class CommunicationService
 	        }
 	    }
 	    
-	    public void cancel()
+	    public synchronized void cancel()
 	    {
 	        this.running = false;
 	    }
@@ -222,7 +222,7 @@ public class CommunicationService
 	    }
 	 
 	    /* Call this from the main activity to shutdown the connection */
-	    public void cancel() throws IOException
+	    public synchronized void cancel() throws IOException
 	    {
 	    	if(! running) return;
 	    	

@@ -29,6 +29,8 @@ public class Main extends Activity
 	private TextView stopInfo;
 	private TextView errorMessage;
 	private TextView nextCallInfo;
+	private TextView missedCalls;
+
 	private CheckBox cbDubious;
 	
 	BroadcastReceiver bluetoothState = new BroadcastReceiver()
@@ -86,10 +88,12 @@ public class Main extends Activity
 		beaconInfo = (TextView) findViewById(R.id.beaconInfo);
 		stopInfo = (TextView) findViewById(R.id.stopInfo);
 		errorMessage = (TextView) findViewById(R.id.errorMessage);
+		missedCalls = (TextView) findViewById(R.id.missedCalls);
 		nextCallInfo = (TextView) findViewById(R.id.nextCallInfo);
 		
 		turnOn = (Button) findViewById(R.id.turnonBtn);
 		disconnect = (Button) findViewById(R.id.disconnectBtn);		
+		//exit = (Button) findViewById(R.id.exitBtn);		
 		cbDubious = (CheckBox)findViewById(R.id.cbDubious);		
 		
 		disconnect.setVisibility(View.GONE);
@@ -100,6 +104,10 @@ public class Main extends Activity
 		errorMessage.setVisibility(View.GONE);
 		errorMessage.setTextColor(Color.RED);
 		errorMessage.setMovementMethod(new ScrollingMovementMethod());
+		
+		
+		missedCalls.setVisibility(View.GONE);
+		missedCalls.setTextColor(Color.BLACK);
 		
 		nextCallInfo.setVisibility(View.GONE);
 		nextCallInfo.setTextColor(Color.BLUE);
@@ -136,12 +144,29 @@ public class Main extends Activity
 				stopInfo.setVisibility(View.GONE);
 				errorMessage.setText("");
 				errorMessage.setVisibility(View.GONE);
+				
+				missedCalls.setText("");
+				missedCalls.setVisibility(View.GONE);
+				
 				turnOn.setVisibility(View.VISIBLE);
 				
 				nextCallInfo.setText("");
 				nextCallInfo.setVisibility(View.GONE);
 			}
 		});
+		
+		
+		
+		/*exit.setOnClickListener(new OnClickListener()
+		{
+			@Override
+			public void onClick(View v)
+			{
+				manager.stopBeacon();
+
+				finish();
+			}
+		});*/
 		
 		
 		cbDubious.setOnClickListener(new OnClickListener() 
@@ -187,6 +212,23 @@ public class Main extends Activity
 	}
 	
 	
+	public void showMissedCalls(int missedCalls)
+	{
+		final String msg = "Missed calls: " + missedCalls;
+		
+		final TextView text = (TextView) Main.this.findViewById(R.id.missedCalls);
+		Main.this.runOnUiThread(new Runnable() 
+        {
+             public void run() 
+             {
+            	 text.setText(msg);
+            	 text.setVisibility(View.VISIBLE);
+             }
+        });
+	}
+	
+	
+	
 	public void showWarning(String msg)
 	{
 		this.errorMessage.setText(msg);
@@ -212,21 +254,28 @@ public class Main extends Activity
 	{
 		statusUpdate.setText(statusText);
 		disconnect.setVisibility(View.VISIBLE);
-		cbDubious.setVisibility(View.VISIBLE);
+		//cbDubious.setVisibility(View.VISIBLE);
 		turnOn.setVisibility(View.GONE);
 	}
-	
-	
-	//public void showNextCallInfo(String msg)
-	//{
-	//	nextCallInfo.setText(msg);
-	//	nextCallInfo.setVisibility(View.VISIBLE);
-	//}
 	
 	
 	public void showNextCallInfo(final String msg)
 	{
 		final TextView text = (TextView) Main.this.findViewById(R.id.nextCallInfo);
+		Main.this.runOnUiThread(new Runnable() 
+        {
+             public void run() 
+             {
+            	 text.setText(msg);
+            	 text.setVisibility(View.VISIBLE);
+             }
+        });
+	}
+	
+	
+	public void showError(final String msg)
+	{
+		final TextView text = (TextView) Main.this.findViewById(R.id.errorMessage);
 		Main.this.runOnUiThread(new Runnable() 
         {
              public void run() 

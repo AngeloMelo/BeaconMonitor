@@ -31,6 +31,7 @@ public class Manager
 	private CallWaiter callWaiterThread;
 	private volatile boolean running = false;
 	private int attempts = 0;
+	private int missedCalls = 0;
 
 	
 	private final Handler mHandler = new Handler() 
@@ -65,14 +66,7 @@ public class Manager
 			}
 			case CommunicationService.MSG_TYPE_CONNECT_EXCEPTION:
 			{
-				String error = "Conn refused. Attempt: " + (++attempts);
-				ui.showWarning(error);
-				if(callWaiterThread != null)
-				{
-					callWaiterThread.cancel();
-				}
-				callWaiterThread = new CallWaiter(5000);
-				callWaiterThread.start();
+				onConnectionException(msg);
 
 				break;
 			}
@@ -87,6 +81,7 @@ public class Manager
 
 			}
 		}
+
 	};
 	
 	
@@ -103,11 +98,6 @@ public class Manager
 	}
 	
 	
-	private synchronized boolean isRunning()
-	{
-		return this.isRunning();
-	}
-	
 	
 	private void init()
 	{
@@ -115,6 +105,7 @@ public class Manager
 		this.startDiscoveryTS = null;
 		this.running = false;
 		this.attempts = 0;
+		this.missedCalls = 0;
 		this.currentConnectedBeacons = new HashMap<String, ConnectionPerformanceInfo>();
 		this.operationMode = BeaconDefaults.OPP_MODE_AUTHENTIC;
 	}
@@ -186,8 +177,6 @@ public class Manager
 			String jsonString = BeaconDefaults.formatJson(btAdapter.getAddress(), getOppMode(), connPerformanceInfo);
 			
 			comunicationService.sendMessage(jsonString);
-			
-			//new BTInterruptor().start();
 		} 
 		catch (IOException e) 
 		{
@@ -212,7 +201,7 @@ public class Manager
 		
 		this.callWaiterThread = new CallWaiter(tic * 1000);
 		this.callWaiterThread.start();
-		
+		this.attempts = 0;
 		//BTInterruptor interrupt = new BTInterruptor();
 		//interrupt.start();
 	}
@@ -225,19 +214,18 @@ public class Manager
 			btAdapter.enable();
 		}
 		
-		if(beaconMac == null) return;
+		if(beaconMac == null) 
+		{
+			String error = "Error: beaconMac is null ";
+			//asdf
+			ui.showError(error);
+			return;
+		}
 		
 		BluetoothDevice beaconDevice = btAdapter.getRemoteDevice(beaconMac);
-		try 
-		{
-			ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(beaconMac);
-			connPerformanceInfo.setLastConnRequestTS(new Date());
-			this.comunicationService.connect(beaconDevice);
-		} 
-		catch (IOException e) 
-		{
-			ui.showError(e);
-		}
+		ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(beaconMac);
+		connPerformanceInfo.setLastConnRequestTS(new Date());
+		this.comunicationService.connect(beaconDevice);
 	}
 	
 	private void startDiscovery() 
@@ -280,6 +268,8 @@ public class Manager
 			
 			//turn off bluetooth
 			btAdapter.disable();
+			
+			init();
 		}
 		catch(Exception e)
 		{
@@ -315,30 +305,24 @@ public class Manager
 		
 		if(isBeacon(remoteDevice))
 		{
-			try 
+			//records the first connection initial date
+			if(!this.currentConnectedBeacons.containsKey(remoteDevice.getAddress()))
 			{
-				//records the first connection initial date
-				if(!this.currentConnectedBeacons.containsKey(remoteDevice.getAddress()))
-				{
-					ConnectionPerformanceInfo connPerformanceInfo = new ConnectionPerformanceInfo();
-					connPerformanceInfo.setStartDiscoveryTS(this.getStartDiscoveryTS());
-					connPerformanceInfo.setBeaconFoundTS(new Date());
-					
-					this.currentConnectedBeacons.put(remoteDevice.getAddress(), connPerformanceInfo);
-				}
-				else
-				{
-					ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(remoteDevice.getAddress());
-					connPerformanceInfo.setStartDiscoveryTS(this.getStartDiscoveryTS());
-					connPerformanceInfo.setBeaconFoundTS(new Date());
-				}
-				comunicationService.connect(remoteDevice);
-				this.ui.showBeaconInfo("Beacon found...");
-			} 
-			catch (IOException e)
+				ConnectionPerformanceInfo connPerformanceInfo = new ConnectionPerformanceInfo();
+				connPerformanceInfo.setStartDiscoveryTS(this.getStartDiscoveryTS());
+				connPerformanceInfo.setBeaconFoundTS(new Date());
+				
+				this.currentConnectedBeacons.put(remoteDevice.getAddress(), connPerformanceInfo);
+			}
+			else
 			{
-				ui.showError(e);
-			}	
+				ConnectionPerformanceInfo connPerformanceInfo = this.currentConnectedBeacons.get(remoteDevice.getAddress());
+				connPerformanceInfo.setStartDiscoveryTS(this.getStartDiscoveryTS());
+				connPerformanceInfo.setBeaconFoundTS(new Date());
+			}
+			this.beaconMac = remoteDevice.getAddress();
+			comunicationService.connect(remoteDevice);
+			this.ui.showBeaconInfo("Beacon found...");
 		}
 	}
 
@@ -389,23 +373,28 @@ public class Manager
 		}
 	}
 	
-	private class BTInterruptor extends Thread
-	{
-		public void run()
-		{
-			try 
-			{
-				sleep(3 * 1000);
-			} 
-			catch (InterruptedException e) 
-			{
-				e.printStackTrace();
-			}
 	
-			btAdapter.disable();
-			btAdapter.enable();
+	private void onConnectionException(Message msg) 
+	{
+		Exception errorMessage = (Exception) msg.obj;
+		missedCalls++;
+		attempts++;
+		
+		String wrnMessage = "Conn refused. " + errorMessage + "\nAttempt: " + (attempts);
+		ui.showWarning(wrnMessage);
+		
+		ui.showMissedCalls(missedCalls);
+		
+		if(callWaiterThread != null)
+		{
+			callWaiterThread.cancel();
 		}
+		
+		//prepare a new call in 5 seconds
+		callWaiterThread = new CallWaiter(5000);
+		callWaiterThread.start();
 	}
+
 	
 	private class CallWaiter extends Thread
 	{

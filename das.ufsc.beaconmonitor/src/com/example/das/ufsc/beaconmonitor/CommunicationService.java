@@ -3,6 +3,9 @@ package com.example.das.ufsc.beaconmonitor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.UUID;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -60,7 +63,7 @@ public class CommunicationService
     }    
     
 	
-    public void connect(BluetoothDevice device) throws IOException 
+    public void connect(BluetoothDevice device) 
     {   	
         // Cancel any thread currently running a connection
         if (mReadWriteThread != null) {mReadWriteThread.cancel(); mReadWriteThread = null;}
@@ -69,8 +72,29 @@ public class CommunicationService
         BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
         
         // Start the thread to connect with the given device
-        mConnectThread = new ConnectThread(device);
-        mConnectThread.start();
+        try 
+        {
+			mConnectThread = new ConnectThread(device);
+			mConnectThread.start();
+		} 
+        catch (IOException e) 
+        {
+        	//TODO
+        	mConnectThread = null;
+        	mHandler.obtainMessage(MSG_TYPE_CONNECT_EXCEPTION, e).sendToTarget();
+		} catch (NoSuchMethodException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalArgumentException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvocationTargetException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
     
 
@@ -88,12 +112,19 @@ public class CommunicationService
 		private final BluetoothSocket mmSocket;
 	    private boolean running = true;
 	    
-	    public ConnectThread(BluetoothDevice device) throws IOException 
+	    public ConnectThread(BluetoothDevice device) throws IOException, NoSuchMethodException, IllegalAccessException, IllegalArgumentException, InvocationTargetException 
 	    {
 	        // Use a temporary object that is later assigned to mmSocket, because mmSocket is final
 	        BluetoothSocket tmp = null;
+
 	        
-	        tmp = device.createInsecureRfcommSocketToServiceRecord(BeaconDefaults.MY_UUID);
+	        Method m;
+	        //m = device.getClass().getMethod("createInsecureRfcommSocket", new Class[]{int.class});
+	        //tmp = (BluetoothSocket)m.invoke(device, Integer.valueOf(1)); 
+	        m = device.getClass().getMethod("createInsecureRfcommSocketToServiceRecord", new Class[] { UUID.class } );
+            tmp = (BluetoothSocket)m.invoke(device, BeaconDefaults.MY_UUID);
+	        
+	        //tmp = device.createInsecureRfcommSocketToServiceRecord(BeaconDefaults.MY_UUID);
 	        mmSocket = tmp;
 	    }
 	 
@@ -222,7 +253,7 @@ public class CommunicationService
 	    }
 	 
 	    /* Call this from the main activity to shutdown the connection */
-	    public synchronized void cancel() throws IOException
+	    public synchronized void cancel() 
 	    {
 	    	if(! running) return;
 	    	
